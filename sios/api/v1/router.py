@@ -39,4 +39,8 @@ class API(wsgi.Router):
                        action='enforce_nova',
                        conditions={'method': ['POST']})
 
+        mapper.connect('/pdp/check_pbac',
+                       controller=pdp_resource,
+                       action='enforce_pbac',
+                       conditions={'method': ['POST']})
         super(API, self).__init__(mapper)

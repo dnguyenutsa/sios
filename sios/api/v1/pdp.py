@@ -58,6 +58,7 @@ class Controller(object):
         self.policy_glance = glance.Enforcer()
         self.policy_nova = nova
         self.pool = eventlet.GreenPool(size=1024)
+        self.policy_pbac = PBAC_PDP()
    
     """
     PDP for glance OpenStack Service
@@ -100,6 +101,46 @@ class Controller(object):
 	    LOG.debug(_('Exception Raised for action [%s]') % req.context.action)
 	    LOG.debug(_('The Policy decision for action [%s] is [False]') % req.context.action)
             return False
+
+    """
+    Checking request against PBAC policy
+    """
+    def check_pbac(self, req):
+        """Evaluate an action against our policies"""
+        try:
+	    LOG.debug(_('Evaluating Policy decision for action [%s]') % req.context.action)
+#            pdp_decision =  self.policy_nova.enforce(req.context, req.context.action, req.context.target)
+	    LOG.debug(_('The Policy decision for action [%s] is [%s]') % (req.context.action, pdp_decision))
+	    return pdp_decision
+        except:
+	    LOG.debug(_('Exception Raised for action [%s]') % req.context.action)
+	    LOG.debug(_('The Policy decision for action [%s] is [False]') % req.context.action)
+            return False
+
+class PBAC_PDP():
+
+    def __init__(self):
+        self.dependencyList = {}
+        self.policyStore = self._load_policy()
+
+    def _load_policy(self):
+        print "************PBAC***********"
+        print "performing policy load"
+        LOG.debug(_('Evaluating Policy decision for action [%s]') % self.dependencyList)
+        return None
+
+    def evaluate_request(self, req):
+        """ evaluate a request """
+
+        
+
+        return False
+
+    def _generate_prov_query(self):
+        return None
+
+    def _match_action_rules(self, action):
+        return None
 
 class Deserializer(wsgi.JSONRequestDeserializer):
     """Handles deserialization of specific controller method requests."""
