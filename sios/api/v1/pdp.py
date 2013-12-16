@@ -33,7 +33,7 @@ from webob import Response
 from sios.policy.glance import glance
 from sios.policy.nova import nova
 import sios.api.v1
-from sios.common import exception
+from sios.common import exception   
 from sios.common import utils
 from sios.common import wsgi
 from sios.openstack.common import strutils
@@ -110,6 +110,7 @@ class Controller(object):
         try:
 	    LOG.debug(_('Evaluating Policy decision for action [%s]') % req.context.action)
 #            pdp_decision =  self.policy_nova.enforce(req.context, req.context.action, req.context.target)
+            pdp_decision = self.policy_pbac.evaluate_request(req)
 	    LOG.debug(_('The Policy decision for action [%s] is [%s]') % (req.context.action, pdp_decision))
 	    return pdp_decision
         except:
@@ -117,27 +118,67 @@ class Controller(object):
 	    LOG.debug(_('The Policy decision for action [%s] is [False]') % req.context.action)
             return False
 
+
+class PBAC_PAP():
+	
+	def __init__(self):
+	
+class PBAC_PIP():
+
+	def __init__(self):
+		self.provService_auth_host = '127.0.0.1'
+		self.provService_auth_port = 6060
+	
+	def generate_prov_query(self, , req, startingNode, dependencyPath):
+		if (context.auth_tok == None):
+          return False
+        headers = {'X-Auth-Token': context.auth_tok, 'X-Action': action, 'X-Target': target, 'Prov-startingNode': startingNode, 'Prov-dependencyPath': dependencyPath}
+        response, data = self._json_request(self.provService_auth_host, self.provService_auth_port, 'POST',
+                                            '/v1/provenance/prov_query', additional_headers=headers)
+        return data
+	
 class PBAC_PDP():
 
     def __init__(self):
         self.dependencyList = {}
-        self.policyStore = self._load_policy()
-
+        self.policySet = self._load_policy()
+		
+		""" get connected to ProvService """
+		self.pbac_pap = PBAC_PAP()
+		self.pbac_pip = PBAC_PIP()
+		
     def _load_policy(self):
         print "************PBAC***********"
         print "performing policy load"
         LOG.debug(_('Evaluating Policy decision for action [%s]') % self.dependencyList)
-        return None
+#		self.policy_file = readJSONfile(fileName)
+		
+        return readJSONfile(fileName)
 
+	""" evaluate a request """
     def evaluate_request(self, req):
-        """ evaluate a request """
+		""" match req to according rules"""
+        self.matched_rules = self.policySet['req.context.action'][Rules]
 
-        
+		""" assure that rules match """
+		if self.matched_rules == []
+			return False
+		
+		
+		for rule_index in range(len(matched_rules)):
+			self.conditions = jsondata['Action']['Rules'][rule_index]['Conditions']
 
-        return False
-
-    def _generate_prov_query(self):
-        return None
+		for cond_index in range(len(self.conditions)):
+			startingNode = self.conditions[cond_index]["exp"][0]["provquery"][0]
+			dependencyPath = self.conditions[cond_index]["exp"][0]["provquery"][1]
+		
+		self._generate_prov_query(self, startingNode, dependencyPath)
+	
+	return False
+			
+    def _generate_prov_query(self, startingNode, dependencyPath):
+		return self.pbac_pip.generate_prov_query(self, startingNode, dependencyPath)
+        #return None
 
     def _match_action_rules(self, action):
         return None
@@ -180,3 +221,13 @@ def create_resource():
     deserializer = Deserializer()
     serializer = Serializer()
     return wsgi.Resource(Controller(), deserializer, serializer)
+
+def readJSONfile(file_name):
+    data = readfile(file_name)
+    json_data = json.loads(data)
+    return json_data
+	
+def readfile(file_name):
+    with open (file_name, "r") as myfile:
+        data=myfile.read()
+        return data
