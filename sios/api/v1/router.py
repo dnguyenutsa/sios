@@ -41,6 +41,6 @@ class API(wsgi.Router):
 
         mapper.connect('/pdp/check_pbac',
                        controller=pdp_resource,
-                       action='enforce_pbac',
+                       action='check_pbac',
                        conditions={'method': ['POST']})
         super(API, self).__init__(mapper)

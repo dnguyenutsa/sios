@@ -38,6 +38,7 @@ from sios.common import utils
 from sios.common import wsgi
 from sios.openstack.common import strutils
 import sios.openstack.common.log as logging
+import json
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
@@ -119,65 +120,67 @@ class Controller(object):
             return False
 
 
-class PBAC_PAP():
+#class PBAC_PAP():
 	
-	def __init__(self):
+#	def __init__(self):
+
 	
 class PBAC_PIP():
 
-	def __init__(self):
-		self.provService_auth_host = '127.0.0.1'
-		self.provService_auth_port = 6060
-	
-	def generate_prov_query(self, , req, startingNode, dependencyPath):
-		if (context.auth_tok == None):
-          return False
-        headers = {'X-Auth-Token': context.auth_tok, 'X-Action': action, 'X-Target': target, 'Prov-startingNode': startingNode, 'Prov-dependencyPath': dependencyPath}
+    def __init__(self):
+        self.provService_auth_host = '127.0.0.1'
+        self.provService_auth_port = 6060
+
+    def generate_prov_query(self, req, startingNode, dependencyPath):
+        if (context.auth_tok == None):
+            return False
+
+        headers = {'X-Auth-Token': context.auth_tok, 'X-Action': action, 'X-Target': target}
+        qbody = {'Prov-startingNode': startingNode, 'Prov-dependencyPath': dependencyPath}
         response, data = self._json_request(self.provService_auth_host, self.provService_auth_port, 'POST',
-                                            '/v1/provenance/prov_query', additional_headers=headers)
+                                            '/v1/provenance/prov_query', additional_headers=headers, body=qbody)
         return data
 	
 class PBAC_PDP():
 
     def __init__(self):
         self.dependencyList = {}
-        self.policySet = self._load_policy()
-		
-		""" get connected to ProvService """
-		self.pbac_pap = PBAC_PAP()
-		self.pbac_pip = PBAC_PIP()
-		
+#        self.policySet = self._load_policy()
+
+        """ get connected to ProvService """
+#        self.pbac_pap = PBAC_PAP()
+        self.pbac_pip = PBAC_PIP()
+
     def _load_policy(self):
         print "************PBAC***********"
         print "performing policy load"
         LOG.debug(_('Evaluating Policy decision for action [%s]') % self.dependencyList)
-#		self.policy_file = readJSONfile(fileName)
-		
+        fileName = "/opt/stack/sios/sios/api/v1/pbac_policy.json"
         return readJSONfile(fileName)
 
 	""" evaluate a request """
     def evaluate_request(self, req):
-		""" match req to according rules"""
+        """ match req to according rules"""
         self.matched_rules = self.policySet['req.context.action'][Rules]
 
-		""" assure that rules match """
-		if self.matched_rules == []
-			return False
-		
-		
-		for rule_index in range(len(matched_rules)):
-			self.conditions = jsondata['Action']['Rules'][rule_index]['Conditions']
+        """ assure that rules match """
+        if self.matched_rules == []:
+            return False
 
-		for cond_index in range(len(self.conditions)):
-			startingNode = self.conditions[cond_index]["exp"][0]["provquery"][0]
-			dependencyPath = self.conditions[cond_index]["exp"][0]["provquery"][1]
-		
-		self._generate_prov_query(self, startingNode, dependencyPath)
-	
-	return False
-			
+
+        for rule_index in range(len(matched_rules)):
+            self.conditions = jsondata['Action']['Rules'][rule_index]['Conditions']
+
+        for cond_index in range(len(self.conditions)):
+            startingNode = self.conditions[cond_index]["exp"][0]["provquery"][0]
+            dependencyPath = self.conditions[cond_index]["exp"][0]["provquery"][1]
+        
+        self._generate_prov_query(self, startingNode, dependencyPath)
+    
+        return False
+    		
     def _generate_prov_query(self, startingNode, dependencyPath):
-		return self.pbac_pip.generate_prov_query(self, startingNode, dependencyPath)
+        return self.pbac_pip.generate_prov_query(self, startingNode, dependencyPath)
         #return None
 
     def _match_action_rules(self, action):
