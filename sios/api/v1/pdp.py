@@ -111,9 +111,9 @@ class Controller(object):
         try:
 	    LOG.debug(_('Evaluating Policy decision for action [%s]') % req.context.action)
 #            pdp_decision =  self.policy_nova.enforce(req.context, req.context.action, req.context.target)
-            pdp_decision = self.policy_pbac.evaluate_request(req)
+            pdp_results = self.policy_pbac.evaluate_request(req)
 	    LOG.debug(_('The Policy decision for action [%s] is [%s]') % (req.context.action, pdp_decision))
-	    return pdp_decision
+	    return pdp_results
         except:
 	    LOG.debug(_('Exception Raised for action [%s]') % req.context.action)
 	    LOG.debug(_('The Policy decision for action [%s] is [False]') % req.context.action)
@@ -135,7 +135,7 @@ class PBAC_PIP():
         if (context.auth_tok == None):
             return False
 
-        headers = {'X-Auth-Token': context.auth_tok, 'X-Action': action, 'X-Target': target}
+        headers = {'X-Auth-Token': context.auth_tok, 'X-Action': action, 'X-Target': target, 'X-startingNode': startingNode, 'X-dependencyPath': dependencyPath}
         qbody = {'Prov-startingNode': startingNode, 'Prov-dependencyPath': dependencyPath}
         response, data = self._json_request(self.provService_auth_host, self.provService_auth_port, 'POST',
                                             '/v1/provenance/prov_query', additional_headers=headers, body=qbody)
