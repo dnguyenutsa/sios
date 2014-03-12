@@ -94,8 +94,11 @@ class Controller(object):
     def enforce_nova(self, req):
         """Authorize an action against our policies"""
         try:
+	    LOG.debug(_('Evaluating Policy decision for action CONTEXT [%s]') % req.context)
 	    LOG.debug(_('Evaluating Policy decision for action [%s]') % req.context.action)
             pdp_decision =  self.policy_nova.enforce(req.context, req.context.action, req.context.target)
+            #self.policy_pbac.generate_prov_query(req, req.context.action, req.context.target)
+            self.policy_pbac.test_request(req)
 	    LOG.debug(_('The Policy decision for action [%s] is [%s]') % (req.context.action, pdp_decision))
 	    return pdp_decision
         except:
@@ -119,11 +122,6 @@ class Controller(object):
 	    LOG.debug(_('The Policy decision for action [%s] is [False]') % req.context.action)
             return False
 
-
-#class PBAC_PAP():
-	
-#	def __init__(self):
-
 	
 class PBAC_PIP():
 
@@ -131,9 +129,10 @@ class PBAC_PIP():
         self.provService_auth_host = '127.0.0.1'
         self.provService_auth_port = 6060
 
-    def generate_prov_query(self, req, startingNode, dependencyPath):
-        if (context.auth_tok == None):
-            return False
+    def generate_prov_query(self, context, startingNode, dependencyPath):
+        #if (context.auth_tok == None):
+        #    return False
+	    #LOG.debug(_('The Auth Token is [%s] is  ') % req.auth_tok)
 
         headers = {'X-Auth-Token': context.auth_tok, 'X-Action': action, 'X-Target': target, 'X-startingNode': startingNode, 'X-dependencyPath': dependencyPath}
         qbody = {'Prov-startingNode': startingNode, 'Prov-dependencyPath': dependencyPath}
@@ -158,6 +157,13 @@ class PBAC_PDP():
         fileName = "/opt/stack/sios/sios/api/v1/pbac_policy.json"
         return readJSONfile(fileName)
 
+    def test_request(self,req):
+        LOG.debug(_('TEST_REQUEST DEBUG[%s]') % self.dependencyList)
+        startingNode = ""
+        dependencyPath = ""
+        self._generate_prov_query(req.context, startingNode, dependencyPath)
+        return None
+
 	""" evaluate a request """
     def evaluate_request(self, req):
         """ match req to according rules"""
@@ -179,9 +185,12 @@ class PBAC_PDP():
     
         return False
     		
-    def _generate_prov_query(self, startingNode, dependencyPath):
-        return self.pbac_pip.generate_prov_query(self, startingNode, dependencyPath)
-        #return None
+    def _generate_prov_query(self, context, startingNode="",dependencyPath=""):
+        LOG.debug(_('Evaluating starting Node for action [%s]') % startingNode)
+
+        LOG.debug(_('Evaluating auth token for action [%s]') % context.target)
+
+        #self.pbac_pip.generate_prov_query(context, startingNode, dependencyPath)
 
     def _match_action_rules(self, action):
         return None
