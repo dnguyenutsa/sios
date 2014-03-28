@@ -39,6 +39,11 @@ from sios.common import wsgi
 from sios.openstack.common import strutils
 import sios.openstack.common.log as logging
 import json
+import httplib
+
+from sios.openstack.common import jsonutils
+from sios.openstack.common import timeutils
+
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
@@ -171,11 +176,13 @@ class RESTConnect(object):
                 datetime_expiry = timeutils.parse_isotime(expiry)
                 return (token, timeutils.normalize_time(datetime_expiry))
             except (AssertionError, KeyError):
-                self.LOG.warn(
+                LOG.warn(
+                #self.LOG.warn(
                     "Unexpected response from keystone service: %s", data)
                 raise ServiceError('invalid json response')
             except (ValueError):
-                self.LOG.warn(
+                LOG.warn(
+                #self.LOG.warn(
                     "Unable to parse expiration time from token: %s", data)
                 raise ServiceError('invalid json response')
     
@@ -233,10 +240,12 @@ class RESTConnect(object):
                     break
                 except Exception as e:
                     if retry == RETRIES:
-                        self.LOG.error('HTTP connection exception: %s' % e)
+                        LOG.error('HTTP connection exception: %s' % e)
+                        #self.LOG.error('HTTP connection exception: %s' % e)
                         raise ServiceError('Unable to communicate with keystone')
                     # NOTE(vish): sleep 0.5, 1, 2
-                    self.LOG.warn('Retrying on HTTP connection exception: %s' % e)
+                    #self.LOG.warn('Retrying on HTTP connection exception: %s' % e)
+                    LOG.warn('Retrying on HTTP connection exception: %s' % e)
                     time.sleep(2.0 ** retry / 2)
                     retry += 1
                 finally:
@@ -275,7 +284,8 @@ class RESTConnect(object):
             try:
                 data = jsonutils.loads(body)
             except ValueError:
-                self.LOG.debug('Keystone did not return json-encoded body')
+                LOG.debug('Keystone did not return json-encoded body')
+                #self.LOG.debug('Keystone did not return json-encoded body')
                 data = {}
     
             return response, data
@@ -334,7 +344,6 @@ class Controller(object):
 	    LOG.debug(_('Evaluating Policy decision for action CONTEXT [%s]') % req.context)
 	    LOG.debug(_('Evaluating Policy decision for action [%s]') % req.context.action)
             pdp_decision =  self.policy_nova.enforce(req.context, req.context.action, req.context.target)
-            #self.policy_pbac.generate_prov_query(req, req.context.action, req.context.target)
             self.policy_pbac.test_request(req)
 	    LOG.debug(_('The Policy decision for action [%s] is [%s]') % (req.context.action, pdp_decision))
 	    return pdp_decision
@@ -365,16 +374,24 @@ class PBAC_PIP():
     def __init__(self):
         self.provService_auth_host = '127.0.0.1'
         self.provService_auth_port = 6060
+        self.connect = RESTConnect()
 
     def generate_prov_query(self, context, startingNode, dependencyPath):
-        #if (context.auth_tok == None):
-        #    return False
-	    #LOG.debug(_('The Auth Token is [%s] is  ') % req.auth_tok)
-        req = RESTConnect()
-        headers = {'X-Auth-Token': context.auth_tok, 'X-Action': action, 'X-Target': target, 'X-startingNode': startingNode, 'X-dependencyPath': dependencyPath}
+        if (context.auth_tok == None):
+            return False
+        LOG.debug(_('Exception Raised for action in GENERATE_PROV_QUERY [%s]') % context.auth_tok)
+        headers = {'X-Auth-Token': context.auth_tok, 'X-Action': context.action, 'X-Target': context.target, 'X-startingNode': startingNode, 'X-dependencyPath': dependencyPath}
         qbody = {'Prov-startingNode': startingNode, 'Prov-dependencyPath': dependencyPath}
-        response, data = req._json_request(self.provService_auth_host, self.provService_auth_port, 'POST',
-                                            '/v1/provenance/prov_query', additional_headers=headers, body=qbody)
+        #response, data = self.connect._json_request(self.provService_auth_host, self.provService_auth_port, 'POST',
+        #                                    '/v1/rdf/enforce_provquery', additional_headers=headers, body=qbody)
+        LOG.debug(_('2nd Exception Raised for action in GENERATE_PROV_QUERY [%s]') % context.target)
+        try:
+            response, data = self.connect._json_request(self.provService_auth_host, 6060, 'POST',
+                                                '/v1/rdf/enforce_provquery', additional_headers=headers, body=qbody)
+        except Exception as e:
+            LOG.debug(_('Exception Raised for JSONREQ [%s]') %e)
+        data = ""
+        #LOG.debug(_('Evaluating Policy decision for action [%s]') % self.provService_auth_port)
         return data
 	
 class PBAC_PDP():
@@ -398,7 +415,9 @@ class PBAC_PDP():
         LOG.debug(_('TEST_REQUEST DEBUG[%s]') % self.dependencyList)
         startingNode = ""
         dependencyPath = ""
-        self._generate_prov_query(req.context, startingNode, dependencyPath)
+        #self.pbac_pip().generate_prov_query(req.context, startingNode, dependencyPath)
+        #self._generate_prov_query(req.context, startingNode, dependencyPath)
+        self.pbac_pip.generate_prov_query(req.context, startingNode, dependencyPath)
         return None
 
 	""" evaluate a request """
