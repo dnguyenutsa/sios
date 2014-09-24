@@ -40,6 +40,7 @@ from sios.openstack.common import strutils
 import sios.openstack.common.log as logging
 import json
 import httplib
+import rdflib
 
 from sios.openstack.common import jsonutils
 from sios.openstack.common import timeutils
@@ -235,6 +236,9 @@ class RESTConnect(object):
             while True:
                 try:
                     conn.request(method, path, **kwargs)
+                    LOG.debug('===================================================================================')
+                    LOG.debug('METHOD %s PATH %s ARGS %s' % (method, path, kwargs))
+                    LOG.debug('===================================================================================')
                     response = conn.getresponse()
                     body = response.read()
                     break
@@ -281,12 +285,13 @@ class RESTConnect(object):
             path = self.auth_admin_prefix + path
     
             response, body = self._http_request(auth_host, auth_port, method, path, **kwargs)
+            LOG.debug(_('JSON REQ response [%s]') % response)
+            LOG.debug(_('JSON REQ body [%s]') % body)
             try:
                 data = jsonutils.loads(body)
             except ValueError:
                 LOG.debug('Keystone did not return json-encoded body')
                 #self.LOG.debug('Keystone did not return json-encoded body')
-                data = {}
     
             return response, data
 
@@ -307,6 +312,9 @@ class Controller(object):
         self.policy_nova = nova
         self.pool = eventlet.GreenPool(size=1024)
         self.policy_pbac = PBAC_PDP()
+        
+        self.prov_graph = rdflib.Graph()
+        self.prov_graph.parse("hws1.rdf")
    
     """
     PDP for glance OpenStack Service
@@ -316,7 +324,25 @@ class Controller(object):
         try:
 	    LOG.debug(_('Evaluating Policy decision for action [%s]') % req.context.action)
             pdp_decision = self.policy_glance.enforce(req.context, req.context.action, req.context.target)
-	    LOG.debug(_('The Policy decision for action [%s] is [%s]') % (req.context.action, pdp_decision))
+#            results = self.policy_pbac.test_request(req)
+#            qres = self.prov_graph.query(
+#                """PREFIX hw: <http://peac/hwgs#>\n
+#                    SELECT ?agent
+#                    WHERE {
+#                        hw:o1v10 (hw:wasGeneratedByReplace)/(hw:usedInput/hw:wasGeneratedByReplace)*/hw:wasControlledBy ?agent.
+#                    }""")
+
+#                """PREFIX hw: <http://peac/hwgs#>\n
+#                    SELECT ?agent
+#                    WHERE {
+#                        hw:o2v0 ^hw:usedInput/hw:wasControlledBy ?agent.
+#                    }""")
+
+            resultList = []
+#            for row in qres:
+#                resultList.append(row)
+#        LOG.debug(_('The Policy decision for action [%s] is [%s]') % (req.context.action, pdp_decision))
+#            pdp_decision = [] 
    	    return pdp_decision
         except:
 	    LOG.debug(_('Exception Raised for action [%s]') % req.context.action)
@@ -341,12 +367,29 @@ class Controller(object):
     def enforce_nova(self, req):
         """Authorize an action against our policies"""
         try:
-	    LOG.debug(_('Evaluating Policy decision for action CONTEXT [%s]') % req.context)
-	    LOG.debug(_('Evaluating Policy decision for action [%s]') % req.context.action)
+        #LOG.debug(_('Evaluating Policy decision for action CONTEXT [%s]') % req.context)
+        #LOG.debug(_('Evaluating Policy decision for action [%s]') % req.context.action)
             pdp_decision =  self.policy_nova.enforce(req.context, req.context.action, req.context.target)
-            self.policy_pbac.test_request(req)
-	    LOG.debug(_('The Policy decision for action [%s] is [%s]') % (req.context.action, pdp_decision))
-	    return pdp_decision
+#            results = self.policy_pbac.test_request(req)
+            qres = self.prov_graph.query(
+                """PREFIX hw: <http://peac/hwgs#>\n
+                    SELECT ?agent
+                    WHERE {
+                        hw:o1v500 (hw:wasGeneratedByReplace)/(hw:usedInput/hw:wasGeneratedByReplace)*/hw:wasControlledBy ?agent.
+                    }""")
+#                """PREFIX hw: <http://peac/hwgs#>\n
+#                    SELECT ?agent
+#                    WHERE {
+#                        hw:o2v0 ^hw:usedInput/hw:wasControlledBy ?agent.
+#                    }""")
+
+            resultList = []
+            for row in qres:
+                resultList.append(row)
+
+        #LOG.debug(_('The results for PBAC check for action [%s] is [%s]') % (req.context.action, results))
+        #LOG.debug(_('The Policy decision for action [%s] is [%s]') % (req.context.action, pdp_decision))
+            return pdp_decision
         except:
 	    LOG.debug(_('Exception Raised for action [%s]') % req.context.action)
 	    LOG.debug(_('The Policy decision for action [%s] is [False]') % req.context.action)
@@ -381,13 +424,15 @@ class PBAC_PIP():
             return False
         LOG.debug(_('Exception Raised for action in GENERATE_PROV_QUERY [%s]') % context.auth_tok)
         headers = {'X-Auth-Token': context.auth_tok, 'X-Action': context.action, 'X-Target': context.target, 'X-startingNode': startingNode, 'X-dependencyPath': dependencyPath}
-        qbody = {'Prov-startingNode': startingNode, 'Prov-dependencyPath': dependencyPath}
+        #headers = {'X-Auth-Token': context.auth_tok, 'X-Action': context.action, 'X-Target': context.target}
+        qbody = "{'Prov-startingNode': startingNode, 'Prov-dependencyPath': dependencyPath}"
         #response, data = self.connect._json_request(self.provService_auth_host, self.provService_auth_port, 'POST',
         #                                    '/v1/rdf/enforce_provquery', additional_headers=headers, body=qbody)
         LOG.debug(_('2nd Exception Raised for action in GENERATE_PROV_QUERY [%s]') % context.target)
         try:
             response, data = self.connect._json_request(self.provService_auth_host, 6060, 'POST',
-                                                '/v1/rdf/enforce_provquery', additional_headers=headers, body=qbody)
+                                                '/v1/rdf/enforce_provquery', additional_headers=headers, body=None)
+# Remember body in http should be string, but sometimes it does not work, use ur body at ur own risk
         except Exception as e:
             LOG.debug(_('Exception Raised for JSONREQ [%s]') %e)
         data = ""
@@ -417,8 +462,8 @@ class PBAC_PDP():
         dependencyPath = ""
         #self.pbac_pip().generate_prov_query(req.context, startingNode, dependencyPath)
         #self._generate_prov_query(req.context, startingNode, dependencyPath)
-        self.pbac_pip.generate_prov_query(req.context, startingNode, dependencyPath)
-        return None
+        results = self.pbac_pip.generate_prov_query(req.context, startingNode, dependencyPath)
+        return results 
 
 	""" evaluate a request """
     def evaluate_request(self, req):
